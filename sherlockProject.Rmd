@@ -1,0 +1,23 @@
+---
+title: "Analysis of the Sherlock Holmes Stories"
+author: "Matteo Pol"
+date: "11/1/2022"
+output:
+  html_document: default
+  pdf_document: default
+editor_options:
+  chunk_output_type: inline
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+
+
+```{r}
+summary(cars)
+```
+
