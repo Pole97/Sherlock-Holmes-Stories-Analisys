@@ -5,19 +5,107 @@ date: "11/1/2022"
 output:
   html_document: default
   pdf_document: default
-editor_options:
+editor_options: 
   chunk_output_type: inline
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+```{r import, include=FALSE} 
+library(dplyr)
+library(tidytext)
+library(tidyverse)
+library(stringr)
+library(wordcloud)
+library(tibble)
+library(stopwords)
+library(plotly)
+library(knitr)
+library(corrplot)
+library(igraph)
+library(tidygraph)
+library(ggraph)
+library(widyr)
 ```
 
-## R Markdown
+## Introduction
 
 
 
-```{r}
-summary(cars)
+```{r prepare stories, include=FALSE}
+#Loading dataset
+stories <- paste("stories/",list.files(path = "stories/"), sep="")
+
+stories <- lapply(stories, function(x) read.delim(x, stringsAsFactors = FALSE, skip = 0, strip.white = TRUE))
+stories <- lapply(stories, function(x) rename(x[1], text = Arthur.Conan.Doyle))
+
+#unnest tokens
+prepare_data <- function(data, book){ data %>%
+  mutate(book = book,
+         linenumber = row_number())}
+
+stories<-lapply(stories, function(x) prepare_data(x[1],x[1][1,1]))
+
+#tokens for every story and remove stopwords
+stories_token_list <- lapply(stories, 
+                        function(story) story %>%
+                        unnest_tokens(word, text) %>%
+                        anti_join(stop_words))
+
+
+stories_token <- stories_token_list[[1]]
+for (i in 2:length(stories_token_list)){
+stories_token <- stories_token %>%
+  rbind(stories_token_list[[i]])
+}
+
+stories_raw <- stories[[1]]['text']
+for (i in 2:length(stories)){
+stories_raw <- stories_raw %>%
+  rbind(stories[[i]]["text"])
+}
+
+```
+```{r prepare novels, include=FALSE}
+#Loading dataset
+
+
+#unnest tokens
+prepare_data <- function(data, book){ data %>%
+  mutate(book = book,
+         linenumber = row_number())}
+
+stories<-lapply(stories, function(x) prepare_data(x[1],x[1][1,1]))
+
+#tokens for every story and remove stopwords
+stories_token_list <- lapply(stories, 
+                        function(story) story %>%
+                        unnest_tokens(word, text) %>%
+                        anti_join(stop_words))
+
+
+stories_token <- stories_token_list[[1]]
+for (i in 2:length(stories_token_list)){
+stories_token <- stories_token %>%
+  rbind(stories_token_list[[i]])
+}
+
+stories_raw <- stories[[1]]['text']
+for (i in 2:length(stories)){
+stories_raw <- stories_raw %>%
+  rbind(stories[[i]]["text"])
+}
+
 ```
 
+# Text mining
+
+##### Frequency analysis with wordcloud 
+
+
+```{r wordcloud_words, echo=FALSE, collapse=TRUE, warning=FALSE}
+words_for_cloud <- stories_token %>%
+  count(word, book, sort = TRUE) 
+
+wordcloud(words = words_for_cloud$word, freq = words_for_cloud$n, min.freq = 10,
+          max.words = 200, random.order = TRUE, random.color = TRUE, rot.per = 0.35, 
+           ordered.colors = TRUE)
+```
