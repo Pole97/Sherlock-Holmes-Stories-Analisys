@@ -33,15 +33,15 @@ devtools::install_github("analyxcompany/resolution")
 #Loading dataset
 houn <- read.delim("https://raw.githubusercontent.com/Pole97/Sherlock-Holmes-Stories-Analisys/main/novels/houn.txt", stringsAsFactors = FALSE, skip = 0, strip.white = TRUE) %>%
   rename(text = THE.HOUND.OF.THE.BASKERVILLES) %>%
-  mutate(color = "red") # THE HOUND OF THE BASKERVILLES
+  mutate(color = "blue") # THE HOUND OF THE BASKERVILLES
 
 sign <- read.delim("https://raw.githubusercontent.com/Pole97/Sherlock-Holmes-Stories-Analisys/main/novels/sign.txt", stringsAsFactors = FALSE, skip = 0, strip.white = TRUE) %>%
   rename(text = THE.SIGN.OF.THE.FOUR) %>%
-  mutate(color = "blue") # THE SIGN OF THE FOUR
+  mutate(color = "green") # THE SIGN OF THE FOUR
 
 stud <- read.delim("https://raw.githubusercontent.com/Pole97/Sherlock-Holmes-Stories-Analisys/main/novels/stud.txt", stringsAsFactors = FALSE, skip = 0, strip.white = TRUE) %>%
   rename(text =  A.STUDY.IN.SCARLET) %>%
-  mutate(color = "green") # A STUDY IN SCARLET
+  mutate(color = "red") # A STUDY IN SCARLET
 
 vall <- read.delim("https://raw.githubusercontent.com/Pole97/Sherlock-Holmes-Stories-Analisys/main/novels/vall.txt", stringsAsFactors = FALSE, skip = 0, strip.white = TRUE) %>%
   rename(text = THE.VALLEY.OF.FEAR) %>%
@@ -117,13 +117,13 @@ novels_counts_bigram <- novels_raw %>%
 
 
 p <- novels_counts_bigram %>%
-  ggplot(aes(book, n, color = book,
+  ggplot(aes(x = factor(book, levels = c("A Study in Scarlet","The Sign of the Four","The Hound of the Baskervilles","The Valley of Fear")), y = n, color = book,
              text = paste0("Bigram: ", bigram,
                            "\n Occurrences: ", n))) +
   geom_point(position = position_jitter(width = 0.48)) +
   theme_classic() +
   theme(legend.position = "none") +
-  labs(x = "Books",
+  labs(x = "Books in cronological order",
         y = "Occourrences") +
   scale_color_manual(values = c("Red", "Blue", "Green", "Yellow")) +
   geom_hline(yintercept = 12, label = "Top 10", alpha = .8, linetype ="longdash", color = "#D0CE7C") 
@@ -148,50 +148,6 @@ ggplotly(p, tooltip = c("text")) %>%
 
 ```
 
-
-```{r}
-stop <- as.data.frame(stopwords("en")) %>%
-  rbind(c("upon"))
-colnames(stop) <- c("word")
-
-bigrams <- novels_raw %>%
-  unnest_tokens(bigram, text, token = "ngrams", n = 2) %>%
-  count(book, bigram, sort = TRUE)
-
-# rimuoviamo le stop word
-bigrams_separated <- bigrams %>%
-  separate(bigram, c("word1", "word2"), sep = " ")
-
-bigrams_filtered <- bigrams_separated %>%
-  filter(!word1 %in% stop$word) %>%
-  filter(!word2 %in% stop$word)
-
-# contiamo
-bigram_counts <- bigrams_filtered %>% 
-  count(word1, word2, sort = TRUE, wt = n)
-
-# riuniamo i bigrammi
-bigrams_united <- bigrams_filtered %>%
-  unite(bigram, word1, word2, sep = " ")
-
-plot <-bigrams_united %>%
-  filter(n > 19) %>%
-  arrange(desc(n))%>%
-  group_by(book) %>%
-  ungroup() %>%
-  mutate(bigram = reorder_within(bigram, n, book))%>%
-  ggplot(aes(bigram, n, fill=book)) +
-  scale_fill_brewer(palette = "Paired")+
-  geom_col(show.legend = TRUE) +
-  coord_flip() +
-  scale_x_reordered() +
-  theme(legend.position='none')+
-  labs(y = "",
-       x = "bigrams occurring 20 times or more")
-ggplotly(plot, tooltip = "name")
-
-
-```
 
 
 ```{r correlation_graph, echo=FALSE, warning=FALSE, fig.width=14, fig.height=10}
