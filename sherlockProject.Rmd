@@ -29,40 +29,6 @@ devtools::install_github("analyxcompany/resolution")
 
 ## Introduction
 
-```{r prepare stories, include=FALSE}
-#Loading dataset
-stories <- paste("stories/",list.files(path = "stories/"), sep="")
-
-stories <- lapply(stories, function(x) read.delim(x, stringsAsFactors = FALSE, skip = 0, strip.white = TRUE))
-stories <- lapply(stories, function(x) rename(x[1], text = Arthur.Conan.Doyle))
-
-#unnest tokens
-prepare_data <- function(data, book){ data %>%
-  mutate(book = book,
-         linenumber = row_number())}
-
-stories<-lapply(stories, function(x) prepare_data(x[1],x[1][1,1]))
-
-#tokens for every story and remove stopwords
-stories_token_list <- lapply(stories, 
-                        function(story) story %>%
-                        unnest_tokens(word, text) %>%
-                        anti_join(stop_words))
-
-
-stories_token <- stories_token_list[[1]]
-for (i in 2:length(stories_token_list)){
-stories_token <- stories_token %>%
-  rbind(stories_token_list[[i]])
-}
-
-stories_raw <- stories[[1]]['text']
-for (i in 2:length(stories)){
-stories_raw <- stories_raw %>%
-  rbind(stories[[i]]["text"])
-}
-
-```
 ```{r prepare novels, include=FALSE}
 #Loading dataset
 houn <- read.delim("https://raw.githubusercontent.com/Pole97/Sherlock-Holmes-Stories-Analisys/main/novels/houn.txt", stringsAsFactors = FALSE, skip = 0, strip.white = TRUE) %>%
@@ -129,14 +95,6 @@ novels_raw <- houn %>%
 
 
 ```{r wordcloud_words, echo=FALSE, collapse=TRUE, warning=FALSE}
-words_for_cloud <- novels_token %>%
-  count(word, book, color, sort = TRUE) 
-
-wordcloud(words = words_for_cloud$word, freq = words_for_cloud$n, min.freq = 40,
-          max.words = 200, random.order = FALSE, random.color = FALSE, rot.per = 0.35, 
-          colors = (words_for_cloud$color), ordered.colors = TRUE)
-
-#words_for_stories
 
 words_frequencies <- novels_token %>%
    count(word, sort = TRUE) 
