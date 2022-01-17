@@ -26,6 +26,8 @@ library(ggraph)
 library(widyr)
 devtools::install_github("analyxcompany/resolution")
 library(stm)
+library(forcats)
+
 ```
 
 ## Introduction
@@ -102,7 +104,7 @@ words_frequencies <- novels_token %>%
    count(word, sort = TRUE) 
 
 wordcloud(words = words_frequencies$word, freq = words_frequencies$n, min.freq = 60,
-          max.words = 200, random.order = FALSE, rot.per = 0.35, 
+          max.words = 70, random.order = FALSE, rot.per = 0.35, 
           colors=brewer.pal(8, "Dark2"))
 
 ```
@@ -111,7 +113,7 @@ wordcloud(words = words_frequencies$word, freq = words_frequencies$n, min.freq =
 ```{r tf-idf, echo=FALSE, collapse=TRUE, warning=FALSE}
 #novels_token_filtered <- novels_token %>%
 #    filter(word != "holmes")
-novels_token_filtered %>%
+novels_token %>%
     count(color,book, word, sort = TRUE) %>%
     bind_tf_idf(word, book, n) %>%
     group_by(book) %>%
@@ -123,13 +125,17 @@ novels_token_filtered %>%
     facet_wrap(~ book, scales = "free") +
     scale_fill_manual(values = colors) +
     coord_flip() 
+```
 
 
-sherlock_dfm <- novels_token_filtered %>%
+```{r topic modeling, echo=FALSE, collapse=TRUE, warning=FALSE}
+sherlock_dfm <- novels_token %>%
+    filter(word != "holmes") %>%
     count(book, word, sort = TRUE) %>%
     cast_dfm(book, word, n)
 
-topic_model <- stm(sherlock_dfm, K = 4, 
+topic_model <- stm(sherlock_dfm, K = 4
+                   , 
                    verbose = FALSE, init.type = "Spectral")
 summary(topic_model)
 
@@ -146,7 +152,6 @@ td_beta %>%
     facet_wrap(~ topic, scales = "free_y") +
     coord_flip() +
     scale_x_reordered() +
-    scale_fill_manual(values = colors) +
     labs(x = NULL, y = expression(beta),
          title = "Highest word probabilities for each topic",
          subtitle = "Different words are associated with different topics")
@@ -177,7 +182,7 @@ bigrams_filtered <- bigrams_separated %>%
   filter(!word2 %in% stop_words$word) 
 
 bigram_counts <- bigrams_filtered %>% 
-  count(word1, word2, sort = TRUE)%>%
+  count(book,word1, word2, sort = TRUE)%>%
   na.omit()
 
 novels_counts_bigram <- bigram_counts %>%
@@ -193,7 +198,7 @@ p <- novels_counts_bigram %>%
   theme_classic() +
   theme(legend.position = "none") +
   labs(x = "Books in cronological order",
-        y = "Occourrences") +
+        y = "Occourrences of bigram") +
   scale_color_manual(values = c("Red", "Blue", "Green", "Yellow")) +
   geom_hline(yintercept = 10, label = "Top 10", alpha = .8, linetype ="longdash", color = "#D0CE7C") 
 ```
@@ -231,7 +236,6 @@ book_tf_idf  <- novels_raw %>%
     count(book, bigram, sort = TRUE) %>%
     bind_tf_idf(bigram, book, n)
 
-library(forcats)
 
 book_tf_idf %>%
   group_by(book) %>%
@@ -244,25 +248,30 @@ book_tf_idf %>%
   labs(x = "tf-idf", y = NULL)
 
 bigram_graph  <- novels_counts_bigram %>%
-  filter(n>9) %>%
+  filter(n>7) %>%
   separate(bigram, c("word1", "word2"), sep = " ") %>%
+  select(word1, word2,n) %>%
   graph_from_data_frame()
-bigram_graph 
 
 #plot graph
 # Using the ggraph function(), we plot the most frequent bi-grams as a network, or “graph” .
 set.seed(2022)
 
-a <- grid::arrow(type = "closed", length = unit(.1, "inches"))
+a <- grid::arrow(type = "closed", length = unit(1, "mm"))
 
 ggraph(bigram_graph, layout = "fr") +
   geom_edge_link(aes(edge_alpha = n), show.legend = FALSE,
-                 arrow = a) +
-  geom_node_point(color = "lightblue", size = 2) +
+                 arrow = a, end_cap = circle(0.5, "mm")) +
+  geom_node_point(color = "lightblue", size = 1) +
   geom_node_text(aes(label = name), repel = TRUE) +
   theme_void()
 
 ```
+
+
+
+
+
 ```{r sentiment analysis}
 
 overall_sentiment <- novels_token %>%
@@ -343,34 +352,12 @@ novel_bigram_counts %>%
        y = "Words preceded by a negation")
 
 
-negated_words <- bigrams_separated %>%
-  filter(word1 %in% negation_words) %>%
-  inner_join(AFINN, by = c(word2 = "word")) %>%
-  count(word1, word2, value, sort = TRUE)
-
-
-negated_words %>%
-  mutate(contribution = n * value,
-         word2 = reorder(paste(word2, word1, sep = "__"), contribution)) %>%
-  group_by(word1) %>%
-  slice_max(abs(contribution), n = 12, with_ties = FALSE) %>%
-  ggplot(aes(word2, contribution, fill = n * value > 0)) +
-  geom_col(show.legend = FALSE) +
-  facet_wrap(~ word1, scales = "free") +
-  scale_x_discrete(labels = function(x) gsub("__.+$", "", x)) +
-  xlab("Words preceded by negation term") +
-  ylab("Sentiment value * # of occurrences") +
-  coord_flip()
-
 ```
-``` {r}
+``` {r sentiment2}
 
 words_by_book <- novels_token %>%
   count(book, word, sort = TRUE) %>%
   ungroup()
-
-novels_cors <- words_by_book %>%
-  pairwise_cor(book, word, n, sort = TRUE)
 
 novels_sentiments <- words_by_book %>%
   inner_join(get_sentiments("afinn"), by = "word") %>%
@@ -402,3 +389,72 @@ top_sentiment_words %>%
 
 ```
 
+<p>Costruendo la matrice con gli indici di correlazione di Pearson relativi ad ogni coppia di storie, la maggior parte delle coppie mostrano una correlazione positiva debole, quindi vuol dire che, nonostante molti racconti siano di argomento simile, il lessico usato varia.Solo in un caso, tra <i>William Wilson</i> e <i>The Murders of the Rue Morgue</i>, si raggiunge lo 0,6.</p>
+```{r}
+
+#non usiamo il set di parole completo, ma quello senza stop word
+frequency <- words_by_book %>%
+  group_by(book) %>%
+  mutate(proportion = n / sum(n)) %>% 
+  select(-n) %>% 
+  spread(book, proportion) 
+
+frequency_matrix <- cor(frequency[, c(-1)], use = "pairwise.complete.obs") 
+corrplot(frequency_matrix,method = "square")
+
+
+ggplot(frequency, aes(x = `The Sign of the Four`, y = `A Study in Scarlet`)) +
+geom_abline(color = "gray40", lty = 2) +
+geom_text(aes(label = word), check_overlap = TRUE, vjust = 1.5) +
+scale_x_log10(labels = percent_format()) +
+scale_y_log10(labels = percent_format()) +
+labs(y = "A Study in Scarlet", x = "The Sign of the Four") +
+theme_light()
+
+ggplot(frequency, aes(x = `The Valley of Fear`, y = `The Hound of the Baskervilles`)) +
+geom_abline(color = "gray40", lty = 2) +
+geom_text(aes(label = word), check_overlap = TRUE, vjust = 1.5) +
+scale_x_log10(labels = percent_format()) +
+scale_y_log10(labels = percent_format()) +
+labs(y = "The Valley of Fear", x = "The Hound of the Baskervilles") +
+theme_light()
+
+```
+
+#Examining Pairwise Correlation
+```{r}
+holmes_section_words <- novels_raw %>%
+  mutate(section = row_number() %/% 10) %>%
+  unnest_tokens(word, text) %>%
+  filter(!word %in% stop_words$word)
+
+
+# we need to filter for at least relatively common words first
+word_cors <- holmes_section_words %>%
+  group_by(word) %>%
+  filter(n() >= 20) %>%
+  pairwise_cor(word, section, sort = TRUE)
+
+word_cors %>%
+  filter(item1 %in% c("holmes", "house", "sir", "time")) %>%
+  group_by(item1) %>%
+  top_n(6) %>%
+  ungroup() %>%
+  mutate(item2 = reorder(item2, correlation)) %>%
+  ggplot(aes(item2, correlation)) +
+  geom_bar(stat = "identity") +
+  facet_wrap(~ item1, scales = "free") +
+  coord_flip()
+
+set.seed(2022)
+
+word_cors %>%
+  filter(correlation > .3) %>%
+  graph_from_data_frame() %>%
+  ggraph(layout = "fr") +
+  geom_edge_link(aes(edge_alpha = correlation), show.legend = FALSE) +
+  geom_node_point(color = "lightblue", size = 2) +
+  geom_node_text(aes(label = name), repel = TRUE) +
+  theme_void()
+
+```
