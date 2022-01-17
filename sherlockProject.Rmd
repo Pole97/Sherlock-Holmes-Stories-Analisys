@@ -24,11 +24,10 @@ library(igraph)
 library(tidygraph)
 library(ggraph)
 library(widyr)
+devtools::install_github("analyxcompany/resolution")
 ```
 
 ## Introduction
-
-
 
 ```{r prepare stories, include=FALSE}
 #Loading dataset
@@ -66,34 +65,62 @@ stories_raw <- stories_raw %>%
 ```
 ```{r prepare novels, include=FALSE}
 #Loading dataset
+houn <- read.delim("https://raw.githubusercontent.com/Pole97/Sherlock-Holmes-Stories-Analisys/main/novels/houn.txt", stringsAsFactors = FALSE, skip = 0, strip.white = TRUE) %>%
+  rename(text = THE.HOUND.OF.THE.BASKERVILLES) %>%
+  mutate(color = "red") # THE HOUND OF THE BASKERVILLES
+
+sign <- read.delim("https://raw.githubusercontent.com/Pole97/Sherlock-Holmes-Stories-Analisys/main/novels/sign.txt", stringsAsFactors = FALSE, skip = 0, strip.white = TRUE) %>%
+  rename(text = THE.SIGN.OF.THE.FOUR) %>%
+  mutate(color = "blue") # THE SIGN OF THE FOUR
+
+stud <- read.delim("https://raw.githubusercontent.com/Pole97/Sherlock-Holmes-Stories-Analisys/main/novels/stud.txt", stringsAsFactors = FALSE, skip = 0, strip.white = TRUE) %>%
+  rename(text =  A.STUDY.IN.SCARLET) %>%
+  mutate(color = "green") # A STUDY IN SCARLET
+
+vall <- read.delim("https://raw.githubusercontent.com/Pole97/Sherlock-Holmes-Stories-Analisys/main/novels/vall.txt", stringsAsFactors = FALSE, skip = 0, strip.white = TRUE) %>%
+  rename(text = THE.VALLEY.OF.FEAR) %>%
+  mutate(color = "yellow") # THE VALLEY OF FEAR
 
 
 #unnest tokens
 prepare_data <- function(data, book){ data %>%
   mutate(book = book,
-         linenumber = row_number())}
+         linenumber = row_number(),
+         chapter = cumsum(
+           str_detect(text, regex("^(Chapter|CHAPTER) [\\divxlc]", ignore_case = TRUE))))}
 
-stories<-lapply(stories, function(x) prepare_data(x[1],x[1][1,1]))
+houn <- prepare_data(houn, "The Hound of the Baskervilles")
+sign <- prepare_data(sign, "The Sign of the Four")
+stud <- prepare_data(stud, "A Study in Scarlet")
+vall <- prepare_data(vall, "The Valley of Fear")
 
 #tokens for every story and remove stopwords
-stories_token_list <- lapply(stories, 
-                        function(story) story %>%
-                        unnest_tokens(word, text) %>%
-                        anti_join(stop_words))
+houn_token <- houn %>%
+  unnest_tokens(word, text) %>%
+  anti_join(stop_words) 
+
+sign_token <- sign %>%
+  unnest_tokens(word, text) %>%
+  anti_join(stop_words) 
+
+stud_token <- stud %>%
+  unnest_tokens(word, text) %>%
+  anti_join(stop_words) 
+
+vall_token <- vall %>%
+  unnest_tokens(word, text) %>%
+  anti_join(stop_words) 
 
 
-stories_token <- stories_token_list[[1]]
-for (i in 2:length(stories_token_list)){
-stories_token <- stories_token %>%
-  rbind(stories_token_list[[i]])
-}
+novels_token <- houn_token %>%
+  rbind(sign_token) %>%
+  rbind(stud_token) %>%
+  rbind(vall_token)
 
-stories_raw <- stories[[1]]['text']
-for (i in 2:length(stories)){
-stories_raw <- stories_raw %>%
-  rbind(stories[[i]]["text"])
-}
-
+novels_raw <- houn %>%
+  rbind(sign) %>%
+  rbind(stud) %>%
+  rbind(vall)
 ```
 
 # Text mining
@@ -102,10 +129,128 @@ stories_raw <- stories_raw %>%
 
 
 ```{r wordcloud_words, echo=FALSE, collapse=TRUE, warning=FALSE}
-words_for_cloud <- stories_token %>%
-  count(word, book, sort = TRUE) 
+words_for_cloud <- novels_token %>%
+  count(word, book, color, sort = TRUE) 
 
-wordcloud(words = words_for_cloud$word, freq = words_for_cloud$n, min.freq = 10,
-          max.words = 200, random.order = TRUE, random.color = TRUE, rot.per = 0.35, 
-           ordered.colors = TRUE)
+wordcloud(words = words_for_cloud$word, freq = words_for_cloud$n, min.freq = 40,
+          max.words = 200, random.order = FALSE, random.color = FALSE, rot.per = 0.35, 
+          colors = (words_for_cloud$color), ordered.colors = TRUE)
+
+#words_for_stories
+
+words_frequencies <- novels_token %>%
+   count(word, sort = TRUE) 
+
+wordcloud(words = words_frequencies$word, freq = words_frequencies$n, min.freq = 60,
+          max.words = 200, random.order = FALSE, rot.per = 0.35, 
+          colors=brewer.pal(8, "Dark2"))
+```
+
+```{r most_used_bigrams, echo=FALSE,  include=FALSE, collapse=TRUE, warning=FALSE}
+novels_counts_bigram <- novels_raw %>%
+  unnest_tokens(bigram, text, token = "ngrams", n = 2) %>%
+  count(bigram, book, color, sort = TRUE) %>%
+  filter(n > 5) %>% #bigrams with at least 4 occurrences, in order to have lighter graphic
+  separate(bigram, c("word1", "word2"), sep = " ") %>%
+  filter(!word1 %in% stop_words$word) %>%
+  filter(!word2 %in% stop_words$word)  %>%
+  na.omit() %>%
+  unite("bigram", word1, word2, sep = " ") 
+
+
+p <- novels_counts_bigram %>%
+  ggplot(aes(book, n, color = book,
+             text = paste0("Bigram: ", bigram,
+                           "\n Occurrences: ", n))) +
+  geom_point(position = position_jitter(width = 0.48)) +
+  theme_classic() +
+  theme(legend.position = "none") +
+  labs(x = "Books",
+        y = "Occourrences") +
+  scale_color_manual(values = c("Red", "Blue", "Green", "Yellow")) +
+  geom_hline(yintercept = 12, label = "Top 10", alpha = .8, linetype ="longdash", color = "#D0CE7C") 
+```
+```{r plot_bigrams, echo=FALSE, collapse=TRUE, warning=FALSE}
+font = list(
+  size = 15,
+  color = "white"
+)
+
+label = list(
+  bordercolor = "transparent",
+  font = font
+)
+ggplotly(p, tooltip = c("text")) %>%
+  config(displayModeBar = FALSE) %>%
+  style(hoverlabel = label) %>%
+  layout(font = font,
+         yaxis = list(fixedrange = TRUE),
+         xaxis = list(fixedrange = TRUE))
+
+
+```
+
+
+```{r}
+stop <- as.data.frame(stopwords("en")) %>%
+  rbind(c("upon"))
+colnames(stop) <- c("word")
+
+bigrams <- novels_raw %>%
+  unnest_tokens(bigram, text, token = "ngrams", n = 2) %>%
+  count(book, bigram, sort = TRUE)
+
+# rimuoviamo le stop word
+bigrams_separated <- bigrams %>%
+  separate(bigram, c("word1", "word2"), sep = " ")
+
+bigrams_filtered <- bigrams_separated %>%
+  filter(!word1 %in% stop$word) %>%
+  filter(!word2 %in% stop$word)
+
+# contiamo
+bigram_counts <- bigrams_filtered %>% 
+  count(word1, word2, sort = TRUE, wt = n)
+
+# riuniamo i bigrammi
+bigrams_united <- bigrams_filtered %>%
+  unite(bigram, word1, word2, sep = " ")
+
+plot <-bigrams_united %>%
+  filter(n > 19) %>%
+  arrange(desc(n))%>%
+  group_by(book) %>%
+  ungroup() %>%
+  mutate(bigram = reorder_within(bigram, n, book))%>%
+  ggplot(aes(bigram, n, fill=book)) +
+  scale_fill_brewer(palette = "Paired")+
+  geom_col(show.legend = TRUE) +
+  coord_flip() +
+  scale_x_reordered() +
+  theme(legend.position='none')+
+  labs(y = "",
+       x = "bigrams occurring 20 times or more")
+ggplotly(plot, tooltip = "name")
+
+
+```
+
+
+```{r correlation_graph, echo=FALSE, warning=FALSE, fig.width=14, fig.height=10}
+word_cor <- novels_token %>%
+  group_by(word) %>%
+  filter(n() >= 50) %>%
+  pairwise_cor(word, chapter, sort = TRUE) %>% #rivedere da sua lezioni
+  na.omit()
+
+a <- grid::arrow(type = "closed", length = unit(.1, "inches"))
+
+word_cor %>%
+  filter(correlation > 0.95) %>%
+  as_tbl_graph() %>%
+  ggraph(layout = "kk") +
+  geom_edge_link(aes(edge_alpha = correlation), show.legend = FALSE, arrow = a) +
+  geom_node_point(color = "lightblue", size = 1) +
+  geom_node_text(aes(label = name), repel = TRUE) +
+  theme_void()
 ```
