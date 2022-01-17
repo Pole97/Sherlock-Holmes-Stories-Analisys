@@ -25,12 +25,14 @@ library(tidygraph)
 library(ggraph)
 library(widyr)
 devtools::install_github("analyxcompany/resolution")
+library(stm)
 ```
 
 ## Introduction
 
 ```{r prepare novels, include=FALSE}
 #Loading dataset
+colors <- c("Red", "Blue", "Green", "Yellow")
 houn <- read.delim("https://raw.githubusercontent.com/Pole97/Sherlock-Holmes-Stories-Analisys/main/novels/houn.txt", stringsAsFactors = FALSE, skip = 0, strip.white = TRUE) %>%
   rename(text = THE.HOUND.OF.THE.BASKERVILLES) %>%
   mutate(color = "blue") # THE HOUND OF THE BASKERVILLES
@@ -102,13 +104,71 @@ words_frequencies <- novels_token %>%
 wordcloud(words = words_frequencies$word, freq = words_frequencies$n, min.freq = 60,
           max.words = 200, random.order = FALSE, rot.per = 0.35, 
           colors=brewer.pal(8, "Dark2"))
+
 ```
+
+
+```{r tf-idf, echo=FALSE, collapse=TRUE, warning=FALSE}
+novels_token_filtered <- novels_token %>%
+    filter(word != "holmes")
+novels_token_filtered %>%
+    count(color,book, word, sort = TRUE) %>%
+    bind_tf_idf(word, book, n) %>%
+    group_by(book) %>%
+    top_n(10) %>%
+    ungroup %>%
+    mutate(word = reorder(word, tf_idf)) %>%
+    ggplot(aes(word, tf_idf, fill = book )) +
+    geom_col(show.legend = FALSE) +
+    facet_wrap(~ book, scales = "free") +
+    scale_fill_manual(values = colors) +
+    coord_flip() 
+
+
+sherlock_dfm <- novels_token_filtered %>%
+    count(book, word, sort = TRUE) %>%
+    cast_dfm(book, word, n)
+
+topic_model <- stm(sherlock_dfm, K = 4, 
+                   verbose = FALSE, init.type = "Spectral")
+summary(topic_model)
+
+td_beta <- tidy(topic_model)
+
+td_beta %>%
+    group_by(topic) %>%
+    top_n(10, beta) %>%
+    ungroup() %>%
+    mutate(topic = paste0("Topic ", topic),
+           term = reorder_within(term, beta, topic)) %>%
+    ggplot(aes(term, beta, fill = as.factor(topic))) +
+    geom_col(alpha = 0.8, show.legend = FALSE) +
+    facet_wrap(~ topic, scales = "free_y") +
+    coord_flip() +
+    scale_x_reordered() +
+    scale_fill_manual(values = colors) +
+    labs(x = NULL, y = expression(beta),
+         title = "Highest word probabilities for each topic",
+         subtitle = "Different words are associated with different topics")
+
+
+td_gamma <- tidy(topic_model, matrix = "gamma",                    
+                 document_names = rownames(sherlock_dfm))
+
+ggplot(td_gamma, aes(gamma, fill = as.factor(topic))) +
+  geom_histogram(alpha = 0.8, show.legend = FALSE) +
+  facet_wrap(~ topic, ncol = 2) +
+  labs(title = "Distribution of document probabilities for each topic",
+       subtitle = "Each topic is associated with a story",
+       y = "Number of stories", x = expression(gamma))
+```
+
 
 ```{r most_used_bigrams, echo=FALSE,  include=FALSE, collapse=TRUE, warning=FALSE}
 novels_counts_bigram <- novels_raw %>%
   unnest_tokens(bigram, text, token = "ngrams", n = 2) %>%
   count(bigram, book, color, sort = TRUE) %>%
-  filter(n > 5) %>% #bigrams with at least 4 occurrences, in order to have lighter graphic
+  filter(n > 3) %>% #bigrams with at least 4 occurrences, in order to have lighter graphic
   separate(bigram, c("word1", "word2"), sep = " ") %>%
   filter(!word1 %in% stop_words$word) %>%
   filter(!word2 %in% stop_words$word)  %>%
@@ -126,7 +186,7 @@ p <- novels_counts_bigram %>%
   labs(x = "Books in cronological order",
         y = "Occourrences") +
   scale_color_manual(values = c("Red", "Blue", "Green", "Yellow")) +
-  geom_hline(yintercept = 12, label = "Top 10", alpha = .8, linetype ="longdash", color = "#D0CE7C") 
+  geom_hline(yintercept = 10, label = "Top 10", alpha = .8, linetype ="longdash", color = "#D0CE7C") 
 ```
 ```{r plot_bigrams, echo=FALSE, collapse=TRUE, warning=FALSE}
 font = list(
@@ -146,25 +206,57 @@ ggplotly(p, tooltip = c("text")) %>%
          xaxis = list(fixedrange = TRUE))
 
 
+
+
 ```
 
+```{r bigram as a network}
 
+book_tf_idf  <- novels_raw %>%
+    unnest_tokens(bigram, text, token = "ngrams", n = 2) %>%
+    separate(bigram, c("word1", "word2"), sep = " ") %>%
+    filter(!word1 %in% stop_words$word) %>%
+    filter(!word2 %in% stop_words$word)  %>%
+    na.omit() %>%
+    unite("bigram", word1, word2, sep = " ") %>%
+    count(book, bigram, sort = TRUE) %>%
+    bind_tf_idf(bigram, book, n)
 
-```{r correlation_graph, echo=FALSE, warning=FALSE, fig.width=14, fig.height=10}
-word_cor <- novels_token %>%
-  group_by(word) %>%
-  filter(n() >= 50) %>%
-  pairwise_cor(word, chapter, sort = TRUE) %>% #rivedere da sua lezioni
-  na.omit()
+library(forcats)
+
+book_tf_idf %>%
+  group_by(book) %>%
+  slice_max(tf_idf, n = 10) %>%
+  ungroup() %>%
+  ggplot(aes(tf_idf, fct_reorder(bigram, tf_idf), fill = book)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~book, ncol = 2, scales = "free") +
+  scale_fill_manual(values = colors) +
+  labs(x = "tf-idf", y = NULL)
+
+bigram_graph  <- novels_counts_bigram %>%
+  filter(n>9) %>%
+  separate(bigram, c("word1", "word2"), sep = " ") %>%
+  graph_from_data_frame()
+bigram_graph 
+
+#plot graph
+# Using the ggraph function(), we plot the most frequent bi-grams as a network, or “graph” .
+set.seed(2022)
 
 a <- grid::arrow(type = "closed", length = unit(.1, "inches"))
 
-word_cor %>%
-  filter(correlation > 0.95) %>%
-  as_tbl_graph() %>%
-  ggraph(layout = "kk") +
-  geom_edge_link(aes(edge_alpha = correlation), show.legend = FALSE, arrow = a) +
-  geom_node_point(color = "lightblue", size = 1) +
+ggraph(bigram_graph, layout = "fr") +
+  geom_edge_link(aes(edge_alpha = n), show.legend = FALSE,
+                 arrow = a) +
+  geom_node_point(color = "lightblue", size = 2) +
   geom_node_text(aes(label = name), repel = TRUE) +
   theme_void()
+
 ```
+```{r sentiment analysis}
+
+
+```
+
+
