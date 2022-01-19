@@ -1,15 +1,17 @@
 ---
-title: "Analysis of the Sherlock Holmes Stories"
+title: "Analysis of the Sherlock Holmes Novels"
 author: "Matteo Pol"
 date: "11/1/2022"
 output:
   html_document: default
   pdf_document: default
-editor_options: 
+  beamer_presentation: default
+editor_options:
   chunk_output_type: inline
 ---
 
 ```{r import, include=FALSE} 
+knitr::opts_chunk$set(echo = FALSE)
 library(dplyr)
 library(tidytext)
 library(tidyverse)
@@ -31,7 +33,26 @@ library(forcats)
 
 ```
 
-## Introduction
+## Introduction 
+
+Sir Arthur Ignatius Conan Doyle (22 May 1859 – 7 July 1930) was a British writer and physician. He created the character Sherlock Holmes in 1887 for A Study in Scarlet, the first of four novels and fifty-six short stories about Holmes and Dr. Watson. The Sherlock Holmes stories are milestones in the field of crime fiction.\n
+
+Referring to himself as a "consulting detective" in the stories, Holmes is known for his proficiency with observation, deduction, forensic science, and logical reasoning that borders on the fantastic, which he employs when investigating cases for a wide variety of clients, including Scotland Yard.\n
+
+The character and stories have had a profound and lasting effect on mystery writing and popular culture as a whole, with the original tales as well as thousands written by authors other than Conan Doyle being adapted into stage and radio plays, television, films, video games, and other media for over one hundred years.\n
+
+In this presentation we will analyze the four novels with techniques of text mining to obtain information on the language used, how homogeneous it is, and how it is classified through the sentiment analysis.\n
+
+<h4> Short summary of the novels:\n </h4>
+
+*A Study in Scarlet*. The story marks the first appearance of Sherlock Holmes and Dr. Watson, who would become the most famous detective duo in literature. The book's title derives from a speech given by Holmes, a consulting detective, to his friend and chronicler Watson on the nature of his work, in which he describes the story's murder investigation as his "study in scarlet": "There's the scarlet thread of murder running through the colourless skein of life, and our duty is to unravel it, and isolate it, and expose every inch of it."
+
+*The Sign of the Four*. As a dense yellow fog swirls through the streets of London, a deep melancholy has descended on Sherlock Holmes, who sits in a cocaine-induced haze at 221B Baker Street. His mood is only lifted by a visit from a beautiful but distressed young woman - Mary Morstan, whose father vanished ten years before. Four years later she began to receive an exquisite gift every year: a large, lustrous pearl. Now she has had an intriguing invitation to meet her unknown benefactor and urges Holmes and Watson to accompany her. And in the ensuing investigation - which involves a wronged woman, a stolen hoard of Indian treasure, a wooden-legged ruffian, a helpful dog and a love affair - even the jaded Holmes is moved to exclaim, 'Isn't it gorgeous!'
+
+*The Hound of the Baskervilles*. The Hound of the Baskervilles is the third of the four crime novels written by Sir Arthur Conan Doyle featuring the detective Sherlock Holmes. Originally serialised in The Strand Magazine from August 1901 to April 1902, it is set largely on Dartmoor in Devon in England's West Country and tells the story of an attempted murder inspired by the legend of a fearsome, diabolical hound of supernatural origin. Sherlock Holmes and his companion Dr. Watson investigate the case. This was the first appearance of Holmes since his apparent death in "The Final Problem", and the success of The Hound of the Baskervilles led to the character's eventual revival.
+
+*The Valley of Fear*. Doyle's final novel featuring the beloved sleuth, Sherlock Holmes, brings the detective and his friend to a country manor where they are preceded by either a murder or a suicide. A card with the initials VV 341 has been left by the body, and discovering the facts of the case gets ever more difficult. The answers to this mystery lie far away from the scene of the crime and across the Atlantic, in a place known as ‘The Valley of Fear’. A secretive organization lies culprit and an infiltration of it is in order.
+
 
 ```{r prepare novels, include=FALSE}
 set.seed(2022)
@@ -98,8 +119,8 @@ novels_raw <- houn %>%
 
 # Text mining
 
-##### Frequency analysis with wordcloud 
-
+#### Frequency analysis with wordcloud 
+This is a wordcloud, a collection, or cluster, of words depicted in different sizes. The biggest and boldest the word appears, the more often it's mentioned within a given text. As you can see the biggest words are "Holmes", the name of the main character, "sir" a prefix used in the Victorian era when someone refereed to another man. Finally "house", "time", "hand", "eyes", "night" that are important words related with murders, the house refers to the murdered one or the Holmes one, the time of when it happened, the hand is what holds murder weapon, the eyes of witness, and the night is the time of the day when most of the murders happens\n
 
 ```{r wordcloud_words, echo=FALSE, collapse=TRUE, warning=FALSE}
 
@@ -111,7 +132,7 @@ wordcloud(words = words_frequencies$word, freq = words_frequencies$n, min.freq =
           colors=brewer.pal(8, "Dark2"))
 
 ```
-
+#### tf-idf
 
 ```{r tf_idf_onegram, echo=FALSE, include=FALSE,collapse=TRUE, warning=FALSE}
 tf_idf_onegram <- novels_token %>%
@@ -129,7 +150,7 @@ ggplot(tf_idf_onegram,aes(word, tf_idf, fill = book )) +
     scale_fill_manual(values = colors) +
     coord_flip() 
 ```
-
+#### Bigram Frequency
 
 ```{r most used bigrams, echo=FALSE, include=FALSE, collapse=TRUE, warning=FALSE}
 
@@ -180,7 +201,6 @@ ggplotly(p, tooltip = c("text")) %>%
   layout(font = font,
          yaxis = list(fixedrange = TRUE),
          xaxis = list(fixedrange = TRUE))
-
 
 
 
@@ -365,12 +385,12 @@ ggplot(frequency, aes(x = `The Sign of the Four`, y = `A Study in Scarlet`)) +
   labs(y = "A Study in Scarlet", x = "The Sign of the Four") +
   theme_light()
 
-ggplot(frequency, aes(x = `The Valley of Fear`, y = `The Hound of the Baskervilles`)) +
+ggplot(frequency, aes(y = `A Study in Scarlet`, x = `The Hound of the Baskervilles`)) +
   geom_abline(color = "gray40", lty = 2) +
   geom_text(aes(label = word), check_overlap = TRUE, vjust = 1.5) +
   scale_x_log10(labels = percent_format()) +
   scale_y_log10(labels = percent_format()) +
-  labs(y = "The Valley of Fear", x = "The Hound of the Baskervilles") +
+  labs(y = "A Study in Scarlet", x = "The Hound of the Baskervilles") +
   theme_light()
 
 ```
