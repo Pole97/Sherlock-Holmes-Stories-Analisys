@@ -5,9 +5,9 @@ date: "11/1/2022"
 output:
   html_document: default
   pdf_document: default
-  beamer_presentation: default
 editor_options:
   chunk_output_type: inline
+always_allow_html: yes
 ---
 
 ```{r import, include=FALSE} 
@@ -27,23 +27,24 @@ library(tidygraph)
 library(ggraph)
 library(widyr)
 library(scales)
-devtools::install_github("analyxcompany/resolution")
 library(stm)
 library(forcats)
+library(topicmodels)
 
+devtools::install_github("analyxcompany/resolution")
 ```
 
-## Introduction 
+# Introduction 
 
-Sir Arthur Ignatius Conan Doyle (22 May 1859 – 7 July 1930) was a British writer and physician. He created the character Sherlock Holmes in 1887 for A Study in Scarlet, the first of four novels and fifty-six short stories about Holmes and Dr. Watson. The Sherlock Holmes stories are milestones in the field of crime fiction.\n
+Sir Arthur Ignatius Conan Doyle (22 May 1859 – 7 July 1930) was a British writer and physician. He created the character Sherlock Holmes in 1887 for A Study in Scarlet, the first of four novels and fifty-six short stories about Holmes and Dr. Watson. The Sherlock Holmes stories are milestones in the field of crime fiction.
 
-Referring to himself as a "consulting detective" in the stories, Holmes is known for his proficiency with observation, deduction, forensic science, and logical reasoning that borders on the fantastic, which he employs when investigating cases for a wide variety of clients, including Scotland Yard.\n
+Referring to himself as a "consulting detective" in the stories, Holmes is known for his proficiency with observation, deduction, forensic science, and logical reasoning that borders on the fantastic, which he employs when investigating cases for a wide variety of clients, including Scotland Yard.
 
-The character and stories have had a profound and lasting effect on mystery writing and popular culture as a whole, with the original tales as well as thousands written by authors other than Conan Doyle being adapted into stage and radio plays, television, films, video games, and other media for over one hundred years.\n
+The character and stories have had a profound and lasting effect on mystery writing and popular culture as a whole, with the original tales as well as thousands written by authors other than Conan Doyle being adapted into stage and radio plays, television, films, video games, and other media for over one hundred years.
 
-In this presentation we will analyze the four novels with techniques of text mining to obtain information on the language used, how homogeneous it is, and how it is classified through the sentiment analysis.\n
+In this presentation we will analyze the four novels with techniques of text mining to obtain information on the language used, how homogeneous it is, and how it is classified through the sentiment analysis.
 
-<h4> Short summary of the novels:\n </h4>
+<h4> Short summary of the novels: </h4>
 
 *A Study in Scarlet*. The story marks the first appearance of Sherlock Holmes and Dr. Watson, who would become the most famous detective duo in literature. The book's title derives from a speech given by Holmes, a consulting detective, to his friend and chronicler Watson on the nature of his work, in which he describes the story's murder investigation as his "study in scarlet": "There's the scarlet thread of murder running through the colourless skein of life, and our duty is to unravel it, and isolate it, and expose every inch of it."
 
@@ -119,8 +120,8 @@ novels_raw <- houn %>%
 
 # Text mining
 
-#### Frequency analysis with wordcloud 
-This is a wordcloud, a collection, or cluster, of words depicted in different sizes. The biggest and boldest the word appears, the more often it's mentioned within a given text. As you can see the biggest words are "Holmes", the name of the main character, "sir" a prefix used in the Victorian era when someone refereed to another man. Finally "house", "time", "hand", "eyes", "night" that are important words related with murders, the house refers to the murdered one or the Holmes one, the time of when it happened, the hand is what holds murder weapon, the eyes of witness, and the night is the time of the day when most of the murders happens\n
+### Frequency analysis with wordcloud 
+This is a wordcloud, a collection, or cluster, of words depicted in different sizes. The biggest and boldest the word appears, the more often it's mentioned within a given text. As you can see the biggest words are "Holmes", the name of the main character, "sir" a prefix used in the Victorian era when someone refereed to another man. Finally "house", "time", "hand", "eyes", "night" that are important words related with murders, the house refers to the murdered one or the Holmes one, the time of when it happened, the hand is what holds murder weapon, the eyes of witness, and the night is the time of the day when most of the murders happens.
 
 ```{r wordcloud_words, echo=FALSE, collapse=TRUE, warning=FALSE}
 
@@ -132,25 +133,10 @@ wordcloud(words = words_frequencies$word, freq = words_frequencies$n, min.freq =
           colors=brewer.pal(8, "Dark2"))
 
 ```
-#### tf-idf
 
-```{r tf_idf_onegram, echo=FALSE, include=FALSE,collapse=TRUE, warning=FALSE}
-tf_idf_onegram <- novels_token %>%
-    count(color,book, word, sort = TRUE) %>%
-    bind_tf_idf(word, book, n) %>%
-    group_by(book) %>%
-    top_n(10) %>%
-    ungroup %>%
-    mutate(word = reorder(word, tf_idf))
-```
-```{r tf_idf_onegram_plot, echo=FALSE, collapse=TRUE, warning=FALSE}
-ggplot(tf_idf_onegram,aes(word, tf_idf, fill = book )) +
-    geom_col(show.legend = FALSE) +
-    facet_wrap(~ book, scales = "free") +
-    scale_fill_manual(values = colors) +
-    coord_flip() 
-```
-#### Bigram Frequency
+### Bigram Frequency
+
+In this case I consider bigrams. This is a plot which each point corrispondes to a bigram (you can check which of them hovering with mouse). It is interesting that the bigram "Sherlock Holmes" occurrences decline over the novels, from 50 times in the first book to only 11 in the last one. What we can observe is that the bigrams with a significant number of occurrences are names such as "Sir Charles" or "Miss Mortsan". The dashed line is the boundary between the top 10 bigrams and the others.
 
 ```{r most used bigrams, echo=FALSE, include=FALSE, collapse=TRUE, warning=FALSE}
 
@@ -205,11 +191,22 @@ ggplotly(p, tooltip = c("text")) %>%
 
 
 ```
-```{r bigram as a network, echo=FALSE, collapse=TRUE, warning=FALSE}
+
+<h4> Bigrams as a network </h4>
+We may be interested in visualizing all of the relationships among words simultaneously, rather than just the top few divided by book. We can arrange the words into a network, or “graph”.
+
+- from: the first word of the bigram
+- to: the second word of the bigram
+- color of the arrow: The number of times the bigram occurs (more times more opaque)
+
+I exuded the brigrams that occurred less than 9 times to exmine only the important ones, for the most part like before we can see name of characters and places, occasionally we can see some objects such as the "wedding ring" in The Valley of Fear.
+
+
+```{r bigram as a network, echo=FALSE, collapse=TRUE, warning=FALSE, fig.width=7, fig.height=5 }
 bigram_graph  <- novels_counts_bigram %>%
-  filter(n>7) %>%
+  filter(n>9) %>%
   separate(bigram, c("word1", "word2"), sep = " ") %>%
-  select(word1, word2,n) %>%
+  select(word1, word2, n) %>%
   graph_from_data_frame()
 
 #plot graph
@@ -226,7 +223,34 @@ ggraph(bigram_graph, layout = "fr") +
 
 ```
 
-```{r tf-idf bigram, echo=FALSE, collapse=TRUE, warning=FALSE}
+### tf-idf  
+
+What are the highest tf-idf words in these four novels? The statistic tf-idf identifies words that are important to a document in a collection of documents; in this case, we’ll see which words are important in one of the novels compared to the others.
+What measuring tf-idf has done here is show us that Arthur Conan Doyle used similar language across hir four novels, and what distinguishes one novel from the rest within the collection of his works are the proper nouns, the names of people and places.
+
+
+```{r tf_idf_unigram, echo=FALSE, include=FALSE,collapse=TRUE, warning=FALSE}
+tf_idf_onegram <- novels_token %>%
+    count(color,book, word, sort = TRUE) %>%
+    bind_tf_idf(word, book, n) %>%
+    group_by(book) %>%
+    slice_max(tf_idf, n = 10) %>%
+    ungroup %>%
+    mutate(word = reorder(word, tf_idf))
+```
+```{r tf_idf_unigram_plot, echo=FALSE, collapse=TRUE, warning=FALSE, fig.width=8, fig.height=6}
+ggplot(tf_idf_onegram,aes(tf_idf, fct_reorder(word, tf_idf), fill = book )) +
+    geom_col(show.legend = FALSE) +
+    facet_wrap(~book, scales = "free") +
+    scale_fill_manual(values = colors) +
+    labs(title = "Exploring tf-idf for unigrams",
+       y = "Words", x = "tf-idf value")
+
+```
+
+For the sake of completeness we pllay the tf-idf technique also to the bigrams and we see that most of them contains the unigrams that we found preiously.
+
+```{r tf-idf bigram, echo=FALSE, collapse=TRUE, warning=FALSE, fig.width=8, fig.height=6}
 
 book_tf_idf  <- novels_raw %>%
     unnest_tokens(bigram, text, token = "ngrams", n = 2) %>%
@@ -247,12 +271,17 @@ book_tf_idf %>%
   geom_col(show.legend = FALSE) +
   facet_wrap(~book, ncol = 2, scales = "free") +
   scale_fill_manual(values = colors) +
-  labs(x = "tf-idf", y = NULL)
+  labs(title = "Exploring tf-idf for bigrams",
+       y = "Bigram", x = "tf-idf value") 
 ```
 
 
 
-#Sentiment analysis
+# Sentiment analysis
+
+### Sentiment anlysis on the four novels
+
+Which are the main sentiments in the books? Of course these are detective novels so I expect that the <span style="color: #F9776D;">negative</span> sentiments are the most present, since they talk about murders and mysteries. I use the sum of the occurrences of the words for each sentiment in order to highlight that. I use colors to highlight <span style="color: #F9776D;">negative</span> and <span style="color: #01BfC5;">positive</span> sentiments. As we expect all the novels have a lot of <span style="color: #F9776D;">negative</span> words, we could say that only 1/3 of the words are <span style="color: #01BfC5;">positive</span> We will use the BING sentiment lexicon.
 
 
 ```{r sentiment_general_analysis, echo=FALSE,include=FALSE, collapse=TRUE, warning=FALSE}
@@ -280,64 +309,31 @@ plot_most_contribution <- sentiment_word_count %>%
 ggplot(overall_sentiment, aes(as.character(book), n, fill=sentiment)) +   
     geom_bar(stat = "identity", position = 'dodge')+
     ggtitle("Negative and positive sentiments for each book") +
+    theme(axis.text.x = element_text(size=8)) +
     xlab("Book") + ylab("No. of words")
+```
+
+### Negative vs positive
+
+Then I plot the top 10 words that contribute the most to the general <span style="color: #F9776D;">negative</span> and <span style="color: #01BfC5;">positive</span> sentiment. As we can see in the <span style="color: #01BfC5;">positive</span> words only 2 exceed 50 unlike all the <span style="color: #F9776D;">negative</span> ones.
 
 
+```{r sentiment_general_analysis_plot_2, echo=FALSE, collapse=TRUE, warning=FALSE}
 ggplot(plot_most_contribution, aes(word, n, fill = sentiment)) +
     geom_col(show.legend = FALSE) +
     facet_wrap(~sentiment, scales = "free_y") +
     labs(y = "Contribution to sentiment",
-         x = NULL) +
+         x = "Words") +
     coord_flip()
 ```
 
+### Top sentiment contribution
 
+We want now explore the top sentiment words for each one of the novels and how much they are involved in defining the sentiment of the book, their contribution is calculated by the value of every word times the number of occurrences, divided by the number of words. For this reason we will use the AFINN sentiment lexicon, in this way each word is not only <span style="color: #01BfC5;">positive</span> or <span style="color: #F9776D;">negative</span> (-1, +1) but it has also a weight attached (from -5 to +5).
 
-```{r sentiment_false_friends, echo=FALSE, collapse=TRUE, warning=FALSE}
-
-AFINN <- get_sentiments("afinn")
-not_words <- bigrams_separated %>%
-  filter(word1 == "not") %>%
-  inner_join(AFINN, by = c(word2 = "word")) %>%
-  count(word2, value, sort = TRUE)
-
-
-not_words %>%
-  mutate(contribution = n * value) %>%
-  arrange(desc(abs(contribution))) %>%
-  head(20) %>%
-  mutate(word2 = reorder(word2, contribution)) %>%
-  ggplot(aes(n * value, word2, fill = n * value > 0)) +
-  geom_col(show.legend = FALSE) +
-  labs(x = "Sentiment value * number of occurrences",
-       y = "Words preceded by \"not\"")
-
-negated_words <- c("not", "without", "don't", "won't")
-
-
-novel_bigram_counts <- novels_bigram %>%
-  count(book, bigram, sort = TRUE) %>%
-  separate(bigram, c("word1", "word2"), sep = " ")
-
-novel_bigram_counts %>%
-  filter(word1 %in% negated_words) %>%
-  count(word1, word2, wt = n, sort = TRUE) %>%
-  inner_join(get_sentiments("afinn"), by = c(word2 = "word")) %>%
-  mutate(contribution = value * n) %>%
-  group_by(word1) %>%
-  slice_max(abs(contribution), n = 10) %>%
-  ungroup() %>%
-  mutate(word2 = reorder_within(word2, contribution, word1)) %>%
-  ggplot(aes(contribution, word2, fill = contribution > 0)) +
-  geom_col(show.legend = FALSE) +
-  facet_wrap(~ word1, scales = "free", nrow = 2) +
-  scale_y_reordered() +
-  labs(x = "Sentiment value * # of occurrences",
-       y = "Words preceded by a negation")
-
-
-```
-``` {r sentiment_contribution, echo=FALSE, collapse=TRUE, warning=FALSE}
+We can see that most of the words are what we can expect within the detective novels genre except in the book *The sign of the four* where the top <span style="color: #01BfC5;">positive</span> and <span style="color: #F9776D;">negative</span> words are coded in this way but the first is used to refer to the treasure behind the main mystery of the story and the second is used as a title for *Miss Mary Morstan* a very important character that will become the wife of Dr. Watson.
+ 
+``` {r sentiment_contribution, echo=FALSE, collapse=TRUE, warning=FALSE, fig.width=8, fig.height=6}
 
 words_by_book <- novels_token %>%
   count(book, word, sort = TRUE) %>%
@@ -357,12 +353,81 @@ top_sentiment_words %>%
   geom_col(show.legend = FALSE) +
   scale_y_reordered() +
   facet_wrap(~ book, scales = "free") +
-  labs(x = "Sentiment value contribution of each word in the book", y = NULL)
+  labs(title= "Sentiment value contribution of each word in the book", x = NULL, y = NULL)
 
 ```
 
-<p>Costruendo la matrice con gli indici di correlazione di Pearson relativi ad ogni coppia di storie, la maggior parte delle coppie mostrano una correlazione positiva debole, quindi vuol dire che, nonostante molti racconti siano di argomento simile, il lessico usato varia.Solo in un caso, tra <i>William Wilson</i> e <i>The Murders of the Rue Morgue</i>, si raggiunge lo 0,6.</p>
-```{r correlation with Pearson, echo=FALSE, collapse=TRUE, warning=FALSE}
+
+### False friends
+
+It is not strange that there is the possibility of *false friends* meaning a <span style="color: #01BfC5;">positive</span> or <span style="color: #F9776D;">negative</span> word preceded by a negation, this would change the word to the opposite meaning. For that reason I decided to explore all the bigrams with "not" as the first word and then I calculated the contribution of each word by doing the product between his sentiment value and the number of occurrences. Lastly I plotted the top 20 word preceded by not based on their absolute contribution. 
+
+The bigrams “not help” and “not wish” were overwhelmingly the largest causes of misidentification, making the text seem much more <span style="color: #01BfC5;">positive</span> than it is. But we can see phrases like “not fear” and “not ashamed” sometimes suggest text is more <span style="color: #F9776D;">negative</span> than it is.
+
+
+```{r sentiment_false_friends, echo=FALSE, collapse=TRUE, warning=FALSE, fig.width=4, fig.height=4}
+
+AFINN <- get_sentiments("afinn")
+not_words <- bigrams_separated %>%
+  filter(word1 == "not") %>%
+  inner_join(AFINN, by = c(word2 = "word")) %>%
+  count(word2, value, sort = TRUE)
+
+
+not_words %>%
+  mutate(contribution = n * value) %>%
+  arrange(desc(abs(contribution))) %>%
+  head(20) %>%
+  mutate(word2 = reorder(word2, contribution)) %>%
+  ggplot(aes(n * value, word2, fill = n * value > 0)) +
+  geom_col(show.legend = FALSE) +
+  labs(x = "Sentiment value * number of occurrences",
+       y = "Words preceded by \"not\"")
+```
+
+“Not” isn’t the only term that provides some context for the following word. We could pick six common words ("not", "without", "don't", "never", "won't", "no") that negate the subsequent term, and use the same joining and counting approach to examine all of them at once. While “not help” is still one of the  most common example, we can also see pairings such as “no doubt”, “no harm”, "no great" and "no good". We can observe that there is a sightly abundance of <span style="color: #F9776D;">negative</span> false friends but considering that the novels have a decisively <span style="color: #F9776D;">negative</span> sentiment we are not too much concerned. 
+
+
+```{r sentiment_false_friends2, echo=FALSE, collapse=TRUE, warning=FALSE, fig.width=8, fig.height=6}
+negated_words <- c("not", "without", "don't", "never", "won't", "no")
+
+
+novel_bigram_counts <- novels_bigram %>%
+  count(book, bigram, sort = TRUE) %>%
+  separate(bigram, c("word1", "word2"), sep = " ") %>%
+  filter(word2 != "no") 
+
+novel_bigram_counts %>%
+  filter(word1 %in% negated_words) %>%
+  count(word1, word2, wt = n, sort = TRUE) %>%
+  inner_join(get_sentiments("afinn"), by = c(word2 = "word")) %>%
+  mutate(contribution = value * n) %>%
+  group_by(word1) %>%
+  slice_max(abs(contribution), n = 8) %>%
+  ungroup() %>%
+  mutate(word2 = reorder_within(word2, contribution, word1)) %>%
+  ggplot(aes(contribution, word2, fill = contribution > 0)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~ word1, scales = "free", nrow = 2) +
+  scale_y_reordered() +
+  labs(x = "Sentiment value * # of occurrences",
+       y = "Words preceded by a negation")
+
+
+```
+
+
+
+# Correlation between the novels
+
+### How these novels are related?
+
+I wonder how much this novels are related. We can expect that being written by the same writer and narrating about the same main characters the four novels will be very similar.
+
+Thereafter, let's visualize the *correlation plot* of the four books using the Pearson correlation indexes. As we predicted they are all very similar between each other this means that Artur Conan Doyle has written each book with a similar style. The couple with the lower index is "A Study in Scarlet" and "The Hound of the Baskervilles" meanwhile "The sign of the four" and "A Study in Scarlet" have a stunning score of 0.73.
+
+
+```{r correlation with Pearson, echo=FALSE, collapse=TRUE, warning=FALSE }
 
 #non usiamo il set di parole completo, ma quello senza stop word
 frequency <- words_by_book %>%
@@ -377,27 +442,58 @@ corrplot(frequency_matrix,method = 'circle', type = 'lower', insig='blank',
          addCoef.col ='black', number.cex = 0.8, diag=FALSE, tl.cex = 0.9, tl.pos='ld',tl.srt=45, cl.cex = 0.6)
 
 
-ggplot(frequency, aes(x = `The Sign of the Four`, y = `A Study in Scarlet`)) +
-  geom_abline(color = "gray40", lty = 2) +
-  geom_text(aes(label = word), check_overlap = TRUE, vjust = 1.5) +
-  scale_x_log10(labels = percent_format()) +
-  scale_y_log10(labels = percent_format()) +
-  labs(y = "A Study in Scarlet", x = "The Sign of the Four") +
-  theme_light()
+```
 
-ggplot(frequency, aes(y = `A Study in Scarlet`, x = `The Hound of the Baskervilles`)) +
-  geom_abline(color = "gray40", lty = 2) +
-  geom_text(aes(label = word), check_overlap = TRUE, vjust = 1.5) +
-  scale_x_log10(labels = percent_format()) +
-  scale_y_log10(labels = percent_format()) +
-  labs(y = "A Study in Scarlet", x = "The Hound of the Baskervilles") +
-  theme_light()
+### What are the words that differs between novels? What are the ones that are used in every book?
+
+Now, let’s calculate the frequency for each word across the entire Sherlock Holmes series versus within each book. This will allow us to compare strong deviations of word frequency within each book as compared to across the entire series.
+
+Words that are close to the line in these plots have similar frequencies across all the novels. For example, words such as “holmes” and “house”,  are fairly common and used with similar frequencies across most of the books. Words that are far from the line are words that are found more in one set of texts than another. Furthermore, words standing out above the line are common across the series but not within that book; whereas words below the line are common in that particular book but not across the series. For example, “watson” stands out above the line in the "A Study in Scarlet". This means that “watson” is fairly common across the entire Sherlock Holmes series but is not used as much in "A Study in Scarlet". In contrast, a word below the line such as “baskerville” in "The Hound of the Baskervilles" suggests this word is common in this novel but far less common across the series.
+
+```{r frequency, echo=FALSE, collapse=TRUE, warning=FALSE, include=FALSE}
+
+# calculate percent of word use across all novels
+sherlock_pct <- novels_token %>%
+        count(word) %>%
+        transmute(word, all_words = n / sum(n))
+
+# calculate percent of word use within each novel
+frequency <- novels_token %>%
+        count(book, word) %>%
+        anti_join(stop_words) %>%
+        mutate(book_words = n / sum(n)) %>%
+        left_join(sherlock_pct) %>%
+        arrange(desc(book_words)) %>%
+        ungroup()
+
+
+```
+```{r frequency plot, echo=FALSE, collapse=TRUE, warning=FALSE, fig.width=14, fig.height=10}
+ggplot(frequency, aes(x = book_words, y = all_words, color = abs(all_words - book_words))) +
+        geom_abline(color = "gray40", lty = 2) +
+        geom_jitter(alpha = 0.1, size = 2.5, width = 0.3, height = 0.3) +
+        geom_text(aes(label = word), check_overlap = TRUE, vjust = 1.5) +
+        scale_x_log10(labels = scales::percent_format()) +
+        scale_y_log10(labels = scales::percent_format()) +
+        scale_color_gradient(limits = c(0, 0.001), low = "darkslategray4", high = "gray75") +
+        facet_wrap(~ book, ncol = 2) +
+        theme(legend.position="none") +
+        labs(y = "Sherlock Novels", x = NULL)
+
 
 ```
 
-#Examining Pairwise Correlation
+### Examining Pairwise Correlation between sections
+
+Tokenizing by n-gram, as we saw previously, is a useful way to explore pairs of adjacent words. However, we may also be interested in words that tend to co-occur within particular documents or particular chapters, even if they don’t occur next to each other.
+
+So we divide the book by sections of 10 row each. Now we want to examine correlation among words, which indicates how often they appear together relative to how often they appear separately. In particular, we’ll focus on the Pearson correlation that it is equivalent to the phi coefficient, a common measure for binary correlation. The focus of the phi coefficient is how much more likely it is that either both word X and Y appear, or neither do, than that one appears without the other. 
+
+Let's plot the top 6 word that correlate to *holmes*, *house*, *sir*, and *time*, that are the four most frequent words. 
+
 ```{r pairwise_prepare, echo=FALSE, include=FALSE, collapse=TRUE, warning=FALSE}
 holmes_section_words <- novels_raw %>%
+  #(book == "The Hound of the Baskervilles") %>%
   mutate(section = row_number() %/% 10) %>%
   unnest_tokens(word, text) %>%
   filter(!word %in% stop_words$word)
@@ -419,14 +515,22 @@ top_corr_plot <- word_cors %>%
   ggplot(aes(item2, correlation)) +
   geom_bar(stat = "identity") +
   facet_wrap(~ item1, scales = "free") +
+  labs(x = "Word", y = "Correlation") +
   coord_flip()
 
 ```
-```{r pairwise_most_occurred_words, echo=FALSE, collapse=TRUE, warning=FALSE}
+
+
+```{r pairwise_counting, echo=FALSE, collapse=TRUE, warning=FALSE}
 top_corr_plot
+```
+
+Just as we used a graph to visualize bigrams, we can use it to visualize the correlations and clusters of words that we found. Note that unlike the bigram analysis, the relationships here are symmetrical, rather than directional (there are no arrows). We can also see that while pairings of names and titles that dominated bigram pairings are common, such as “sherlock/holmes” or "sir/henry", we can also see pairings of words that appear close to each other, such as “common” and “sense”, or “lantern” and “light”. The four most common words are highlighted in red, we notice the absence of the words "time" and "house" this means that although they are used very often, they are scattered in all the sections and not in specific ones.
+
+```{r pairwise_most_occurred_words, echo=FALSE, collapse=TRUE, warning=FALSE, fig.width=14, fig.height=10}
 
 g<-word_cors %>%
-  filter(correlation > .3) %>%
+  filter(correlation > .25) %>%
   graph_from_data_frame() %>%
   ggraph(layout = "fr") 
 
@@ -442,8 +546,16 @@ g + geom_edge_link(aes(edge_alpha = correlation), show.legend = FALSE) +
 ```
 
 
-#Topic modeling
-```{r topic modeling, echo=FALSE, collapse=TRUE, warning=FALSE}
+# Topic modeling
+
+### Comparison of the topics of the four novels, have they some topics in common? 
+
+We begin by providing a technical overview of the STM model. Like other topic models, the STM is a generative model of word counts. That means we define a data generating process for each document and then use the data to find the most likely values for the parameters within the model. This method is used for extracting the per-topic-per-word probabilities, called $\beta$ (“beta”), from the model.
+
+Now let's visualize 10 words that are the most common in each topic that were extracted from the books. Meanwhile the second topic contains mostly common and neutral words, the first seems to refer to the book "The Hund of the Baskervilles"
+
+```{r topic modeling beta, echo=FALSE, collapse=TRUE, warning=FALSE}
+
 sherlock_dfm <- novels_token %>%
     filter(word != "holmes") %>%
     count(book, word, sort = TRUE) %>%
@@ -451,7 +563,6 @@ sherlock_dfm <- novels_token %>%
 
 topic_model <- stm(sherlock_dfm, K = 2, 
                    verbose = FALSE, init.type = "Spectral")
-#summary(topic_model)
 
 td_beta <- tidy(topic_model)
 
@@ -469,8 +580,15 @@ td_beta %>%
     labs(x = NULL, y = expression(beta),
          title = "Highest word probabilities for each topic",
          subtitle = "Different words are associated with different topics")
+```
 
+### What topic define each book?
 
+Besides estimating each topic as a mixture of words, stm assign the probability that each book is generated from each topic. We can examine the per-document-per-topic probabilities, called $\gamma$ (“gamma”).
+
+In this case, one novel is strongly associated with the first and more specific topic meanwhile the second and more general topic is associated with three books. In any case, this is how we interpret these gamma probabilities; they tell us which topics are coming from which documents.
+
+```{r topic modeling gamma, echo=FALSE, collapse=TRUE, warning=FALSE}
 td_gamma <- tidy(topic_model, matrix = "gamma",                    
                  document_names = rownames(sherlock_dfm))
 
@@ -480,3 +598,8 @@ ggplot(td_gamma, aes(gamma, fill = as.factor(topic))) +
   labs(title = "Distribution of document probabilities for each topic",
        y = "Number of stories", x = expression(gamma))
 ```
+
+# Conclusions
+
+This analysis proves that through data science we are able to extract all the information necessary to understand a text in a sufficiently precise way and find out its secrets. Starting from simple text mining techniques we analyzed the word frequency and the most related words in order to have a shallow idea of the topics of the book. We then explored the sentiment of each book and we understand that you have to look at group of words and the relations between them to truly extract the true information behind the characters. Finally, we studied more deeply the book with topic modeling in order to better understand the topic of the texts. 
+
