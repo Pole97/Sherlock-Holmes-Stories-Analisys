@@ -551,7 +551,7 @@ g + geom_edge_link(aes(edge_alpha = correlation), show.legend = FALSE) +
 
 ### Comparison of the topics of the four novels, have they some topics in common? 
 
-We will use Latent Dirichlet allocation (LDA), a particularly popular method, for fitting a topic model. t treats each document as a mixture of topics, and each topic as a mixture of words. This allows documents to “overlap” each other in terms of content, rather than being separated into discrete groups, in a way that mirrors typical use of natural language.
+We will use Latent Dirichlet allocation (LDA), a particularly popular method, for fitting a topic model. It treats each document as a mixture of topics, and each topic as a mixture of words. This allows documents to “overlap” each other in terms of content, rather than being separated into discrete groups, in a way that mirrors typical use of natural language.
 
 We first use the model found by LDA for extracting the per-topic-per-word probabilities, called $\beta$ (“beta”), from the model.
 
@@ -590,7 +590,7 @@ td_beta %>%
 
 ### What topic define each book?
 
-Besides estimating each topic as a mixture of words, stm assign the probability that each book is generated from each topic. We can examine the per-document-per-topic probabilities, called $\gamma$ (“gamma”).
+Besides estimating each topic as a mixture of words, LDA assign the probability that each book is generated from each topic. We can examine the per-document-per-topic probabilities, called $\gamma$ (“gamma”).
 
 In this case each novel has 50% of each topic. This reinforce what we saw untill now, the novels use similar language and in a similar way. 
 
