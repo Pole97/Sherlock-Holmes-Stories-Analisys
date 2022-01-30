@@ -249,7 +249,7 @@ ggplot(tf_idf_onegram,aes(tf_idf, fct_reorder(word, tf_idf), fill = book )) +
 
 ```
 
-For the sake of completeness we pllay the tf-idf technique also to the bigrams and we see that most of them contains the unigrams that we found preiously.
+For the sake of completeness we apply the tf-idf technique also to the bigrams and we see that most of them contains the unigrams that we found previously.
 
 ```{r tf-idf bigram, echo=FALSE, collapse=TRUE, warning=FALSE, fig.width=8, fig.height=6}
 
@@ -551,9 +551,11 @@ g + geom_edge_link(aes(edge_alpha = correlation), show.legend = FALSE) +
 
 ### Comparison of the topics of the four novels, have they some topics in common? 
 
-We begin by providing a technical overview of the STM model. Like other topic models, the STM is a generative model of word counts. That means we define a data generating process for each document and then use the data to find the most likely values for the parameters within the model. This method is used for extracting the per-topic-per-word probabilities, called $\beta$ (“beta”), from the model.
+We will use Latent Dirichlet allocation (LDA), a particularly popular method, for fitting a topic model. t treats each document as a mixture of topics, and each topic as a mixture of words. This allows documents to “overlap” each other in terms of content, rather than being separated into discrete groups, in a way that mirrors typical use of natural language.
 
-Now let's visualize 10 words that are the most common in each topic that were extracted from the books. Meanwhile the second topic contains mostly common and neutral words, the first seems to refer to the book "The Hund of the Baskervilles"
+We first use the model found by LDA for extracting the per-topic-per-word probabilities, called $\beta$ (“beta”), from the model.
+
+Now let's visualize 10 words that are the most common in each topic that were extracted from the books. All the 2 topics seem to include general words, the first one seem more about the witness and place of the found bodies, meanwhile the second one seem about the murder and the time of it. 
 
 ```{r topic modeling beta, echo=FALSE, collapse=TRUE, warning=FALSE}
 
@@ -563,7 +565,7 @@ sherlock_dfm <- novels_token %>%
     cast_dfm(book, word, n)
 
 topic_model <- stm(sherlock_dfm, K = 2, 
-                   verbose = FALSE, init.type = "Spectral")
+                   verbose = FALSE, init.type = "LDA")
 
 td_beta <- tidy(topic_model)
 
@@ -581,13 +583,16 @@ td_beta %>%
     labs(x = NULL, y = expression(beta),
          title = "Highest word probabilities for each topic",
          subtitle = "Different words are associated with different topics")
+
+
+
 ```
 
 ### What topic define each book?
 
 Besides estimating each topic as a mixture of words, stm assign the probability that each book is generated from each topic. We can examine the per-document-per-topic probabilities, called $\gamma$ (“gamma”).
 
-In this case, one novel is strongly associated with the first and more specific topic meanwhile the second and more general topic is associated with three books. In any case, this is how we interpret these gamma probabilities; they tell us which topics are coming from which documents.
+In this case each novel has 50% of each topic. This reinforce what we saw untill now, the novels use similar language and in a similar way. 
 
 ```{r topic modeling gamma, echo=FALSE, collapse=TRUE, warning=FALSE}
 td_gamma <- tidy(topic_model, matrix = "gamma",                    
